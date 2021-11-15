@@ -14,3 +14,8 @@ It does not implement:
   * functions related to system-specific error/signal names (`strerror` and co., `strsignal`);
   * functions that are marked as “LEGACY” in POSIX.1-2001 and removed in POSIX.1-2008 (e.g. `index`, `rindex`, `bcmp`, `bcopy`, `bzero`);
   * functions that are not thread-safe (`strtok`; note that `strtok_r` *is* implemented).
+
+Licence
+===
+
+`liblite` is licensed under LGPL-3.0+. See `COPYLING.LESSER.txt` for more details.
