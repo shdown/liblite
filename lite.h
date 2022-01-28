@@ -301,10 +301,10 @@ LITE_INHEADER bool lite_strstartswith(const char *s, const char *prefix)
     for (size_t i = 0; ; ++i) {
         char c = prefix[i];
         if (c == '\0') {
-            return 1;
+            return true;
         }
         if (c != s[i]) {
-            return 0;
+            return false;
         }
     }
 }
