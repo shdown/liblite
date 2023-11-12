@@ -6,7 +6,7 @@
 It might be of use if you mess with really small strings and need maximum performance. In those circumstances, it wins against glibc’s `<string.h>` because:
   * it is header-only, so all functions are ready to be inlined — no function call overhead;
   * the “dumbest way possible” approach means small code footprint, which makes it inline-friendly and instruction cache-friendly;
-  * it does not do manual loop unrolling — no size checks overhead. Your compiler may still decide to unroll some loops automatically, though.
+  * it does not do loop unrolling or vectorization — no size checks overhead.
 
 It does not implement:
   * functions related to [C locales](https://github.com/mpv-player/mpv/commit/1e70e82baa9193f6f027338b0fab0f5078971fbe);

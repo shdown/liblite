@@ -24,13 +24,18 @@
 #include <string.h>
 #include <stdbool.h>
 
-#define LITE_INHEADER           static inline __attribute__((unused))
+#define LITE_INHEADER static inline __attribute__((unused))
+
+// Prevent the compiler from replacing the whole thing with a call to a function
+// from <string.h>, vectorizing the loop, or emitting rep* instructions (rep*
+// have significant startup overhead).
 #define LITE_COMPILER_BARRIER() __asm__ volatile ("" ::: "memory")
 
 LITE_INHEADER void *lite_memcpy_fw(void *dst, const void *src, size_t n)
 {
     for (size_t i = 0; i < n; ++i) {
         ((char *) dst)[i] = ((const char *) src)[i];
+        LITE_COMPILER_BARRIER();
     }
     return dst;
 }
@@ -40,6 +45,7 @@ LITE_INHEADER void *lite_memcpy_bw(void *dst, const void *src, size_t n)
     while (n) {
         --n;
         ((char *) dst)[n] = ((const char *) src)[n];
+        LITE_COMPILER_BARRIER();
     }
     return dst;
 }
@@ -64,6 +70,7 @@ LITE_INHEADER void *lite_memccpy(void *dst, const void *src, char c, size_t n)
         if ((((char *) dst)[i] = ((const char *) src)[i]) == c) {
             return ((char *) dst) + i + 1;
         }
+        LITE_COMPILER_BARRIER();
     }
     return NULL;
 }
@@ -71,10 +78,8 @@ LITE_INHEADER void *lite_memccpy(void *dst, const void *src, char c, size_t n)
 LITE_INHEADER void *lite_memset(void *p, char c, size_t n)
 {
     for (size_t i = 0; i < n; ++i) {
-        // Prevent the compiler from emitting 'rep stos', unrolling the loop, or, god forbid,
-        // replacing the entire thing with a call to 'memset()'.
-        LITE_COMPILER_BARRIER();
         ((char *) p)[i] = c;
+        LITE_COMPILER_BARRIER();
     }
     return p;
 }
@@ -82,8 +87,10 @@ LITE_INHEADER void *lite_memset(void *p, char c, size_t n)
 LITE_INHEADER char *lite_strcpy(char *dst, const char *src)
 {
     size_t i = 0;
-    while ((dst[i] = src[i]) != '\0')
+    while ((dst[i] = src[i]) != '\0') {
         ++i;
+        LITE_COMPILER_BARRIER();
+    }
     return dst;
 }
 
@@ -95,6 +102,7 @@ LITE_INHEADER char *lite_strncpy(char *dst, const char *src, size_t n)
             lite_memset(dst + i, '\0', n - i);
             break;
         }
+        LITE_COMPILER_BARRIER();
     }
     return dst;
 }
@@ -102,8 +110,10 @@ LITE_INHEADER char *lite_strncpy(char *dst, const char *src, size_t n)
 LITE_INHEADER char *lite_stpcpy(char *dst, const char *src)
 {
     size_t i = 0;
-    while ((dst[i] = src[i]) != '\0')
+    while ((dst[i] = src[i]) != '\0') {
         ++i;
+        LITE_COMPILER_BARRIER();
+    }
     return dst + i;
 }
 
@@ -114,6 +124,7 @@ LITE_INHEADER char *lite_stpncpy(char *dst, const char *src, size_t n)
             lite_memset(dst + i + 1, '\0', n - i - 1);
             return dst + i;
         }
+        LITE_COMPILER_BARRIER();
     }
     return dst + n;
 }
@@ -121,16 +132,20 @@ LITE_INHEADER char *lite_stpncpy(char *dst, const char *src, size_t n)
 LITE_INHEADER size_t lite_strlen(const char *s)
 {
     size_t i = 0;
-    while (s[i] != '\0')
+    while (s[i] != '\0') {
         ++i;
+        LITE_COMPILER_BARRIER();
+    }
     return i;
 }
 
 LITE_INHEADER size_t lite_strnlen(const char *s, size_t n)
 {
     size_t i = 0;
-    while (i < n && s[i] != '\0')
+    while (i < n && s[i] != '\0') {
         ++i;
+        LITE_COMPILER_BARRIER();
+    }
     return i;
 }
 
@@ -150,6 +165,7 @@ LITE_INHEADER char *lite_strncat(char *dst, const char *src, size_t n)
             break;
         }
         p[i] = c;
+        LITE_COMPILER_BARRIER();
     }
     p[i] = '\0';
     return dst;
@@ -159,9 +175,12 @@ LITE_INHEADER void *lite_memchr(const void *p, char c, size_t n)
 {
     const char *sp = p;
     const char *sp_end = sp + n;
-    for (; sp != sp_end; ++sp)
-        if (*sp == c)
+    for (; sp != sp_end; ++sp) {
+        if (*sp == c) {
             return (void *) sp;
+        }
+        LITE_COMPILER_BARRIER();
+    }
     return NULL;
 }
 
@@ -171,6 +190,7 @@ LITE_INHEADER void *lite_rawmemchr(const void *p, char c)
         if (*sp == c) {
             return (void *) sp;
         }
+        LITE_COMPILER_BARRIER();
     }
 }
 
@@ -183,6 +203,7 @@ LITE_INHEADER void *lite_memrchr(const void *p, char c, size_t n)
         if (*sp_end == c) {
             return (void *) sp_end;
         }
+        LITE_COMPILER_BARRIER();
     }
     return NULL;
 }
@@ -197,6 +218,7 @@ LITE_INHEADER int lite_memcmp(const void *p, const void *q, size_t n)
         if (cp != cq) {
             return cp < cq ? -1 : 1;
         }
+        LITE_COMPILER_BARRIER();
     }
     return 0;
 }
@@ -212,6 +234,7 @@ LITE_INHEADER int lite_strcmp(const char *p, const char *q)
         if (cp != cq) {
             return cp < cq ? -1 : 1;
         }
+        LITE_COMPILER_BARRIER();
     }
 }
 
@@ -226,6 +249,7 @@ LITE_INHEADER int lite_strncmp(const char *p, const char *q, size_t n)
         if (cp != cq) {
             return cp < cq ? -1 : 1;
         }
+        LITE_COMPILER_BARRIER();
     }
     return 0;
 }
@@ -239,6 +263,7 @@ LITE_INHEADER char *lite_strchr(const char *s, char c)
         } else if (cs == '\0') {
             return NULL;
         }
+        LITE_COMPILER_BARRIER();
     }
 }
 
@@ -249,6 +274,7 @@ LITE_INHEADER char *lite_strchrnul(const char *s, char c)
         if (cs == c || cs == '\0') {
             return (char *) s;
         }
+        LITE_COMPILER_BARRIER();
     }
 }
 
@@ -262,6 +288,7 @@ LITE_INHEADER char *lite_strrchr(const char *s, char c)
         } else if (cs == c) {
             last = s;
         }
+        LITE_COMPILER_BARRIER();
     }
 }
 
@@ -271,6 +298,7 @@ LITE_INHEADER size_t lite_strcspn(const char *haystack, const char *needle)
         if (lite_strchr(needle, haystack[i]) != NULL) {
             return i;
         }
+        LITE_COMPILER_BARRIER();
     }
 }
 
@@ -283,6 +311,7 @@ LITE_INHEADER char *lite_strpbrk(const char *haystack, const char *needle)
         } else if (lite_strchr(needle, c) != NULL) {
             return (char *) haystack;
         }
+        LITE_COMPILER_BARRIER();
     }
 }
 
@@ -293,6 +322,7 @@ LITE_INHEADER size_t lite_strspn(const char *haystack, const char *needle)
         if (c == '\0' || lite_strchr(needle, c) == NULL) {
             return i;
         }
+        LITE_COMPILER_BARRIER();
     }
 }
 
@@ -306,6 +336,7 @@ LITE_INHEADER bool lite_strstartswith(const char *s, const char *prefix)
         if (c != s[i]) {
             return false;
         }
+        LITE_COMPILER_BARRIER();
     }
 }
 
@@ -323,6 +354,7 @@ LITE_INHEADER char *lite_strstr(const char *haystack, const char *needle)
         if (c == needle0 && lite_strstartswith(haystack + 1, needle + 1)) {
             return (char *) haystack;
         }
+        LITE_COMPILER_BARRIER();
     }
 }
 
@@ -337,6 +369,7 @@ LITE_INHEADER void *lite_memmem(const void *haystack, size_t nhaystack, const vo
         if (lite_memcmp(s, needle, nneedle) == 0) {
             return (void *) s;
         }
+        LITE_COMPILER_BARRIER();
     }
     return NULL;
 }
